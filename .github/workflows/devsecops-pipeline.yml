@@ -1,4 +1,4 @@
-name: DevSecOps Pipeline (SAST + Docker Security + Multi-arch)
+name: DevSecOps Pipeline - SAST + Docker Security (con fail en graves)
 
 on:
   push:
@@ -24,16 +24,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # ==================== SAST - CodeQL ====================
+      # ====== SAST-CodeQL ===========
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: javascript
 
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+      - name: Perform CodeQL Analysis (SAST)
+        uses: github/codeql-action/analyze@v4
 
-      # ==================== Docker Build & Push Multi-arch ====================
+      # ======= Docker Multi-arch Build ====================
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -44,12 +44,35 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push multi-arch Docker image
+      - name: Build Docker image (multi-arch)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: ghcr.io/alberto12x/devsecops-demo:latest
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          load: true
+
+      # =========== Escaneo con Trivy (falla el pipeline) ====
+      - name: Scan Docker image with Trivy (falla en HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'ghcr.io/alberto12x/devsecops-demo:latest'
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL, HIGH'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+
+      # ===== Push solo si todo OK ========
+      - name: Push multi-arch image to GHCR
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/devsecops-demo:latest
+          tags: ghcr.io/alberto12x/devsecops-demo:latest
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
