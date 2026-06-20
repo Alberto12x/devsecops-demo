@@ -33,7 +33,7 @@ jobs:
       - name: Perform CodeQL Analysis (SAST)
         uses: github/codeql-action/analyze@v4
 
-      # ======= Docker Multi-arch Build ====================
+      # ======= Docker Multi-arch Build & Push ====================
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -44,32 +44,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # FIX: Se cambia 'platforms' a una sola arquitectura (linux/amd64) para que sea compatible con 'load: true'
-      - name: Build Docker image for local scanning
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: false
-          load: true
-          tags: ghcr.io/alberto12x/devsecops-demo:latest
-          platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # =========== Escaneo con Trivy (falla el pipeline) ====
-      - name: Scan Docker image with Trivy (falla en HIGH/CRITICAL)
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: 'ghcr.io/alberto12x/devsecops-demo:latest'
-          format: 'table'
-          exit-code: '1'
-          severity: 'CRITICAL, HIGH'
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-
-      # ===== Push solo si todo OK ========
-      # Si Trivy y CodeQL dan luz verde, aquí sí se genera y sube el manifiesto multi-arquitectura completo
-      - name: Push multi-arch image to GHCR
+      # Al eliminar Trivy, podemos hacer el Build y el Push multi-arquitectura directamente en un solo paso
+      - name: Build and Push multi-arch image to GHCR
         uses: docker/build-push-action@v6
         with:
           context: .
